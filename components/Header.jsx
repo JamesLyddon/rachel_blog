@@ -14,10 +14,10 @@ const Header = () => {
 
   return (
     <div className="container mx-auto mb-8 px-10">
-      <div className="inline-block w-full border-b-4 border-emerald-500 py-10">
+      <div className="inline-block w-full border-b-4 border-emerald-500 pt-10 pb-4">
         <div className="block md:float-left">
           <Link href="/">
-            <span className="cursor-pointer text-4xl font-bold text-stone-700">
+            <span className="cursor-pointer text-4xl font-bold text-stone-800">
               Recruiter Tutor
             </span>
           </Link>
@@ -25,7 +25,7 @@ const Header = () => {
         <div className="hidden md:float-left md:contents">
           {categories.map((category, index) => (
             <Link key={index} href={`/category/${category.slug}`}>
-              <span className="mt-2 ml-4 cursor-pointer align-middle font-semibold text-stone-600 md:float-right">
+              <span className="mt-2 ml-4 cursor-pointer align-middle font-semibold text-stone-700 md:float-right">
                 {category.name}
               </span>
             </Link>

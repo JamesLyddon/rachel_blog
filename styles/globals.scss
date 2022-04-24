@@ -2,15 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-// @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Patua+One&display=swap');
 
 html,
 body {
   padding: 0;
   margin: 0;
-  font-family: 'Permanent Marker', sans-serif;
+  font-family: 'Patua One', sans-serif;
   &:before {
     content: '';
     content: '';
@@ -25,7 +26,7 @@ body {
     //   #ffd0a3
     // );
     // background: #ffe8d2;
-    background-image: url('../public/bg5.jpg');
+    background-image: url('../public/bg7.jpg');
     position: fixed;
     left: 0;
     top: 0;
