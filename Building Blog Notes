@@ -1,0 +1,2150 @@
+https://www.youtube.com/watch?v=HYv55DhgTuA&t=476s
+
+We're going to make a blog for rachel that will include a CMS for her to add,remove, modify posts.
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+TECHNOLOGIES:
+
+GraphQL - Query language for our API. Alternative to REST. More precise queries and results.
+
+GraphCMS - Content Management System. Allows us to work with GraphQL more easily. Will allow us to create and deliver content (I think like Compass for MongoDB).
+
+TailwindCSS - Utility first css framework. A collection of predefined utility classes to quickly customise our site without reinventing the wheel (e.g. text-blue-500, h-16, font-extrabold etc.). So if we want large bold green text we could, using tailwind, make its class 'class="text-center font-bold text-green-500"'.
+
+NEXT.js - Make fast SEO optimised react apps. React is typically rendered client side (browser fetches JavaScript and injects it into the blank html) and this has some downsides: 1. will not be reliably recognised by all search engines 2. Slower. Next.js allows us to render the react app content first on the server (Node.js) so the user is just given the fully rendered html in one go ('first paint'), then client side rendering takes over. The point is that for search engines etc they get the whole picture rather than a fracured one. Doing it this way means we get fully rendered content for bots and interactive content for users.
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+General Concepts:
+
+- Making components in a components folder (think lego blocks)
+- Component = importing libraries, creating state, fetching data with useEffect, returning JSX
+- Exporting components all in one go from a single index.js file in the componenets folder
+- Making Schema, models, and instances of those models in GraphCMS
+- Using GraphQL and API Playgroung in GraphCMS to generate queries and make requests
+- Writing these request functions in services/index.js using request and gql from 'graphql=-request'
+- Mapping over arrays of model instances to display in JSX. Remembering to assign keys for siblings when iterating like this to help React only rerender what is necessary/notice when something hasn't changed/not rely on order for identity (reodering causing a rerender)
+- Using NextJS routing using project's file strucutre
+- Using environment variables to store our database API location so it can be referenced from anywhere
+- Global styles .scss file along with utility classes using tailwindcss on components
+- Resources like images live in the public folder
+- Pages folder is the heart of the app - acts like the landing page for routing
+- Understand the difference between pages and components - UI elements vs UI endpoints (made up of modular UI elements)
+- !Need to understand getStaticProps()
+- !Need to understand how data is flowing through project (one way in react)
+- !Need to understand structure of app, how it is rendered, and how data flows step by step
+
+
+High level view of making a NextJS with GraphQL and GraphCMS app:
+
+0. Use GraphCMS to make a schema with models of the objects we will need in our app (e.g. author, category, post, comment etc.). Make instances of these models so we will have placeholders to interact with whilst developing our app (can't fetch and display/iterate over anything without some data). You could also use a 3rd party API in place of your own database.
+
+1. Make Next js app project - dependencies with be next, react, and react-dom. React and react-dom allow us to build the UI. React apps are rendered client side which can be low and lead to poor SEO. NextJS is a framework on top of react that allows content to be prerendered on the server so the user and bots get fully rendered html at first glance, with client side then taking over allowing interactivity. NextJS controls how and when html files are generated.
+
+2. Most important folder is /pages. This contains our index.tsx, _app.tsx, our api folder, and any dynamic [slug].tsx pages we will make (which will use the nextjs router from 'next/router'). NextJS allows this folder to be our site structure without further routing - the file sturcture of /pages mirrors the urls the browser with navigate to.
+
+3. /.next folder is generated when we run dev or build scripts. This folder is what 'serves' our nextjs application. /.next and /node_modules are git ignored so they are mainly to support us during development and are shrunk down to essentials when deploying/building.
+
+4. Any resources we want to use in our app (images, svgs etc) should go in our public folder
+
+5. When we visist localhost:3000 during development pages/index.js is the file that is rendered. pages/index is essentially just a component function (Home) followed by a getStaticProps function. pages/_app exports a function that recieves a component and pageProps. This function is what returns the Home component function from index and allows us to define the layout of our application.
+
+6. Control Flow - 'npm run dev' will run _app which return the Home component from pages/index:
+
+	.next --> _app --> index --> UI rendered on local host
+
+7. We will not write our entire app inside of pages/index. Instead, we create react components (in .jsx format in a components folder) and functions to store queries and make requests on our back end (in a services folder, writting in an index.js file). By importing these modular display componenet and data fetching functions we can build out our landing/home page in pages/index.
+
+8. For dynamically generated pages we can use [slug].tsx files in sub folders (like post and category, this will be part of the url remember) within pages (not included in url; its the root). This will consist of a boiler plate jsx structure to be populated by the appropriate data depending on what the user does. It does this by taking the slug and using this to return the appropriate data which our .jsx code can then map over and display in our UI.
+
+9.a) index and all our dynamic [slug] files end with 'export async function getStaticProps()' but what is this? This files are 'pages' and not regular component files. getStaticProps() is used for prerendering and not client-side data fetching. Essentially this is where we request data asynchronously by passing in params.slug and using services/index query/request functions. It then returns the data as props for the component function (e.g. Home) to use. It runs only on the server side so any console logged data will appear in our terminal, not the browser dev tools. Because of this we can actually write server side code here, like accessing the file system 'fs' etc. getStaticProps() does not go to the browser at all so we also don't need to worry about api keys (since this is client-side fetching and we never talk to the client side, only serve data before that stage/pregenerate). getStaticProps() should always return an object containing a props key with another object as a value: return{ props: {posts}}.
+
+9.b) Think of it like mounting data for the component function to make use of but only at build time (to use for prerendering). This is perfect for a blog site where data doesn't change often but if we want a site that does change often (e.g. booking a flight) then we would need to generate each page 'at request time' using server side rendering. This would then use 'getServerSideProps()' but we won't get into that now. Bare in mind that in development 'build time' is every time we modify the file since NextJS is constantly rebuilding it for us. In production the site isn't so dynamic as it seems to us in development.
+
+10. pages/api is a folder where we can write .js files to make CRUD opertions on our backend. It does this in the similar services/index query->request format use to just read data but along with the endpoint of our database it needs a token (generated from our database) to get permission to make CRUD operations. In our blog app we will just make a api/comments.js so we can send and recieve comments to our databse from our application since this is the only user input we need. Blog posts themselves will be generated in GraphCMS
+
+
+Step by step:
+
+> Use GraphCMS to make schema and placeholder data
+> Initialise Next.js app with: npx create-next-app -e with-tailwindcss ./
+> Intall dependancies with: npm install graphql graphql-request html-react-parser moment react-multi-carousel sass
+> Clear boilerplate from Index.js/.tsx
+> Make a new components folder and build components (rafce with snippets) e.g. reusable blocks to jsx to display
+> Make a styles folder and global.scss file to create global styles for your page (e.g. background image)
+> Ensure global.scss is imported into the _app.js/.tsx file
+> Make Header and Layout component - Header first then other components as children of layout
+> Fetch data from API using query (API playground to generate)
+> Make PostCard component to show brief summary of posts' data
+> Make PostWidget to show 3 recent or related posts
+> Make Categories widget
+> Make dynamic [slug].js page to show individual atricles (complex, more research needed)
+
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 1 - CREATE GRAPH CMS SCHEMA
+
+We're going to use GraphCMS to create the schemas for our blog so our data can persist.
+
+To do this we're going to set up 4 models for our site: Author, Categories, Comments, Entire Post.
+
+
+Login/SignUp -> New Project -> blank or Schema template -> name and where to host -> create project -> choose plan
+
+Setup your schema -> create model -> name and create (e.g. Author) -> add fields to model (e.g. Name )
+
+Add other needed fields (e.g. image/multiline text) -> Create any other models you need along with their fields
+
+This will require further research when making our own but essentially we made 4 models, one of which (post) will have 'relationship' fields (or references) with the other models.
+
+This was all done in the schema tab in GraphCMS (stack of paper). Below that is the content tab (pencil on paper).
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 2 - CREATE CONTENT/INSTANCES
+
+Content is where we can create new instances of our models e.g. Author. We simply hit create, add data, and publish.
+
+We are making and populating this schema (and it's models and instances) first since when we want to start coding we're going to need some data to fetch, even if its only temporary place holders. For our purposes we need an author, a category, and a post (which will be made last since it needs a category and author).
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 3 - CREATING THE PROJECT
+
+Create a new empty folder (say on desktop) -> open VSCode -> drag and drop folder into VSCode to open it.
+
+Open terminal (will be in the new folder dir) -> initialise a new Next.js application with:
+
+	npx create-next-app -e with-tailwindcss ./
+
+This creates a new Next.js with tailwind, the './' tells it to create in our current directory.
+
+Before we run this we can install the necessary dependencies:
+
+	npm install graphql graphql-request html-react-parser moment react-multi-carousel sass
+
+Now we can start our application with:
+
+	npm run dev
+
+In React this was 'npm start' but in next it's 'npm run dev'.
+
+This will show us our app on localhost:3000 and it will be a boiler plate next.js app with some helpful links.
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 4 - UNDERSTANDING THE PROJECT FILESTRUCTURE
+
+NextJS has made an entire project with folders and files, here we will look at a couple:
+
+PAGES folder - Most important folder - holds index.js (starting point, most important component) and _app.js (second most important component) and an api folder. NextJS allows us to make apis without needing a backend.
+
+PUBLIC folder - Used for deployment and publishing.
+
+We'll be making our own folder for components etc but for now we will clean up our index.js in /pages to start from a blank slate. To do this we'll delete everything except the outer div and the head:
+
+	import type { NextPage } from 'next'
+	import Head from 'next/head'
+	import Image from 'next/image'
+
+	const Home: NextPage = () => {
+	  return (
+	    <div className="flex min-h-screen flex-col items-center justify-center py-2">
+	      <Head>
+	        <title>Create Next App</title>
+	        <link rel="icon" href="/favicon.ico" />
+	      </Head>
+
+
+	    </div>
+	  )
+	}
+
+	export default Home
+
+*tutorial references .js files but they all seem to be .tsx files now (typescript file using JSX)*
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 5 - BUILDING HOME ROUTE JSX
+
+In our index.js/.tsx we will list the components that will make up our home view. We do this by making a new components folder and building them there. We also make a new index.js file in the components folder and use this to export the components all in one go/place:
+
+	export { default as PostCard } from './PostCard'
+	export { default as Categories } from './Categories'
+	export { default as PostWidget } from './PostWidget'
+
+As you can see we made three components (rafce to auto fill using snippets). Here is an example of one, PostCard.jsx:
+
+	import React from 'react'
+
+	const PostCard = ({ post }) => {
+	  return (
+	    <div>
+	      {post.title}
+	      {post.excerpt}
+	    </div>
+	  )
+	}
+
+	export default PostCard
+
+We then import and include these components where we want them to be included in our Ppages/index.tsx jsx:
+
+	import { PostCard, Categories, PostWidget } from '../components'
+
+	...
+	...
+	...
+
+	const Home: NextPage = () => {
+	  return (
+	    <div className="container mx-auto mb-8 px-10">
+	      <Head>
+	        <title>CMS Blog</title>
+	        <link rel="icon" href="/favicon.ico" />
+	      </Head>
+	      <div className="gap12 grid grid-cols-1 lg:grid-cols-12">
+	        <div className="col-span-1 lg:col-span-8">
+	          {posts.map((post) => (
+	            <PostCard post={post} key={post.title} />
+	          ))}
+	        </div>
+	        <div className="col-span-1 lg:col-span-4">
+	          <div className="relative top-8 lg:sticky">
+	            <PostWidget />
+	            <Categories />
+	          </div>
+	        </div>
+	      </div>
+	    </div>
+	  )
+
+We are now basically done with the Home JSX
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 6 - CREATING GLOBAL STYLES
+
+Our global styles will be the only css that we do not write as tailwind utility classes.
+
+To begin we make a new folder called styles in the root with a file globals.scss inside it (this was made automatically as a .css file in our case).
+
+This file will start with this:
+
+	@tailwind base;
+	@tailwind components;
+	@tailwind utilities;
+
+and then contiue with default styles we wish to implement as a foundation.
+
+Be sure that the global styles are imported in _app.tsx/.js
+
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STP 7 - NAVBAR/HEADER
+
+Make a new component called Header (remember to export in index.js). This will be made using a series of divs to make the container, left icon/text, and a container to map over the categories for nav links. Styling is done with tailwind.
+
+Rather than displaying the Header directly we will wrap it in another 'Layout' componenet so that we can ensure the Header component is always visible (remember to export with index).
+
+To return multiple components we need to usually wrap them in a div. We can also wrap them in a REACT FRAGMENT like this:
+
+	return (
+		<>
+			<p>Hello</p>
+			<p>World</p>
+		</>
+	)
+
+Here is our Layout component:
+
+	import React from 'react'
+	import { Header } from './'
+
+	const Layout = ({ children }) => {
+	  return <>
+	      <Header />
+	      {children}
+	  </>
+	}
+
+	export default Layout	
+
+Now we can wrap out components in our app inside this Layout component and it will then always render the Header component first and the the children the Layout tags surround:
+
+	import React, { useEffect, useState } from 'react'
+	import { Layout } from '../components'
+
+	import '../styles/globals.scss'
+
+	import type { AppProps } from 'next/app'
+
+	function MyApp({ Component, pageProps }: AppProps) {
+	  return (
+	    <Layout>
+	      <Component {...pageProps} />
+	    </Layout>
+	  )
+	}
+
+	export default MyApp
+
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 8 - FETCH REAL DATA FROM GRAPHCMS
+
+To start we make a new folder in our project called services and inside that a new index.js file.
+
+Then we import request and gql from graphql-request:
+
+	'import { request, gql } from 'graphql-request''
+
+graphql-request is a 'minimal GraphQL client supporting Node and browsers for scripts or simple apps'. It allows us to make GraphQL queries. We use gql to make a query object and use the request method to make that query to our API/database.
+
+Here is the basic shell of a query:
+
+	import { request, gql } from 'graphql-request'
+
+	export const getPosts = async () => {
+	  const query = gql`
+	        query MyQuery {
+	            
+	        }
+	    `
+	}
+
+Queries can get complicated so to help with this we can open GraphCMS and use their API PLAYGROUND. With this we can navigate what queries we want to make and it will give us the code we need. Use Explorer to generate new queries.
+
+Here we select: postsConnection -> edges -> node -> author -> bio -> check:bio,name,id,photo>url
+
+And the API playground will generate this code for us:
+
+query MyQuery {
+  postsConnection {
+    edges {
+      node {
+        author {
+          bio
+          name
+          id
+          photo {
+            url
+          }
+        }
+      }
+    }
+  }
+}
+
+As you can see it's simply traversing our database but it is much easier to generate through navigation like this than to try and remember how everything is nested. Node is basically where all of our data lives in this example. 
+
+Remember we said this was a benefit of GraphQL - that we can choose to get only what we want and not the whole object like with REST APIs.
+
+This was a quick example but our whole query is actually more complex:
+
+query MyQuery {
+  postsConnection {
+    edges {
+      node {
+        author {
+          bio
+          name
+          id
+          photo {
+            url
+          }
+        }
+        createdAt
+        slug
+        title
+        excerpt
+        featuredImage {
+          url
+        }
+        categories {
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+
+You can imagine this would be a lot harder to do off of the top of your head in VSCode.
+
+Now in GraphCMS's API playground we can hit the play button and we will see the data that will be returned from this query:
+
+{
+  "data": {
+    "postsConnection": {
+      "edges": [
+        {
+          "node": {
+            "author": {
+              "bio": "JSM helps aspiring developers reach new heights",
+              "name": "JSM",
+              "id": "ckzwq63nk2nwq0d15po3jfrts",
+              "photo": {
+                "url": "https://media.graphcms.com/t36za5zR2mGz50L19GGl"
+              }
+            },
+            "createdAt": "2022-02-21T13:42:07.795483+00:00",
+            "slug": "react-testing",
+            "title": "React Testing",
+            "excerpt": "Lorem ipsum dolor sit amet. Id consequatur ullam aut dolorem molestiae sit reprehenderit exercitationem qui provident molestiae ad rerum ipsum est consequuntur dolorem a quae natus. ",
+            "featuredImage": {
+              "url": "https://media.graphcms.com/2n8jdeGJSM2FVmVVO3kN"
+            },
+            "categories": [
+              {
+                "name": "Web Development",
+                "slug": "webdev"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+
+We only have the one placeholder currently but this woould fetch all of our authors, categories etc.
+
+Finally, we can copy and paste the query we've generated into our code (in index.js in services folder):
+
+	import { request, gql } from 'graphql-request'
+
+	export const getPosts = async () => {
+	  const query = gql`
+	    query MyQuery {
+	      postsConnection {
+	        edges {
+	          node {
+	            author {
+	              bio
+	              name
+	              id
+	              photo {
+	                url
+	              }
+	            }
+	            createdAt
+	            slug
+	            title
+	            excerpt
+	            featuredImage {
+	              url
+	            }
+	            categories {
+	              name
+	              slug
+	            }
+	          }
+	        }
+	      }
+	    }
+	  `
+	}
+
+(notice we leave out the last brace and 'query MyQuery {' since we already had that in our code)
+
+So we've outlined a query with gql`....` but we haven't actually used it to ask for any data yet. For that we use request() after the backtick:
+
+  const result = await request(graphqlAPI, query)
+
+But where is this graphAPI coming from? This is a variable that will be used to store the url of our API. We haven't made it yet but we will do so at the top making use of environment variables.
+
+At the top of our query we declare the variable:
+
+	const graphqlAPI = process.env.NEXT_PUBLIC_GRAPHCMS_ENDPOINT
+
+This is assigning it to the value of this environment variables. To assign an environment variable we make a new '.env' file in the root and here we can assign it the url to our API.
+
+	NEXT_PUBLIC_GRAPHCMS_ENDPOINT=https://api-eu-west-2.graphcms.com/v2/ckza9ro2k1mv201wgaf6g16kg/master
+
+(remember to stop the application and restart it to implement the assigning of this env variable)
+
+So where did we get this url? Go to GraphCMS and go to:
+
+	settings -> environments -> copy the master environment url
+
+So now our request is getting our API's location as the first argument and our query as the second argument!
+
+Finally we can return our result and the index.js file in services is complete!:
+
+	import { request, gql } from 'graphql-request'
+
+	const graphqlAPI = process.env.NEXT_PUBLIC_GRAPHCMS_ENDPOINT
+
+	export const getPosts = async () => {
+	  const query = gql`
+	    query MyQuery {
+	      postsConnection {
+	        edges {
+	          node {
+	            author {
+	              bio
+	              name
+	              id
+	              photo {
+	                url
+	              }
+	            }
+	            createdAt
+	            slug
+	            title
+	            excerpt
+	            featuredImage {
+	              url
+	            }
+	            categories {
+	              name
+	              slug
+	            }
+	          }
+	        }
+	      }
+	    }
+	  `
+
+	  const result = await request(graphqlAPI, query)
+
+	  return result.postsConnection.edges;
+	}
+
+The last step is to go to our pages/index.tsx file and execute this code. We do this by importing:
+
+	import { getPosts } from '../services'
+
+Then we actually get this data using an async function below/outside of the component like so:
+
+	export async function getStaticProps() {
+	  const posts = (await getPosts()) || []
+
+	  return {
+	    props: { posts },
+	  }
+	}
+
+And then we return the data as a prop. If we don't manage to get the data for some reason we are returned an empty array.
+
+So this fetches the posts but how can we use them inside of our component? As props of course! We simple destructure and pass them into the Home() function!
+
+!ERROR!
+
+We will get an error now and this is because we aren't allowed to access our API yet. What we have to do is go to:
+
+	GraphCMS -> Settings -> API Access -> initialise defaults
+
+This will then give our app access to read the posts we have created in GraphCMS.
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 9 - BUILD POST CARD COMPONENT
+
+Now we have the data and we are displaying it by passing it in as a prop into the PostCard component. Now we can go to this component and format it how we want to display each post.
+
+First we import the moment library and the Link component (from next) so we can work with time stamps and Link components:
+
+	import React from 'react'
+	import moment from 'moment'
+	import Link from 'next/link'
+
+	const PostCard = ({ post }) => {
+	  return (
+	    <div>
+	      {post.title}
+	      {post.excerpt}
+	    </div>
+	  )
+	}
+
+	export default PostCard
+
+Our returned data is currently an object cotaining the node object e.g. {node: {...}}
+
+To access the data then we dont just write post.title.etc but post.node.title.etc
+
+We can simplify this but changing the prop we pass to the component in index from post={post} to post={post.node}.
+
+We're creating a reuseable component to display a quick summary of each post. This will consist of data such as an image the author the author image the excerpt links to go to the post etc.
+
+This is achieved with divs, utility classes, Link components, the moment library(for time) and our post prop:
+
+	import React from 'react'
+	import moment from 'moment'
+	import Link from 'next/link'
+
+	const PostCard = ({ post }) => {
+	  return (
+	    <div className="mb-8 rounded-lg bg-white p-0 pb-12 shadow-lg lg:p-8">
+	      <div className="relative mb-6 overflow-hidden pb-80 shadow-md">
+	        <img
+	          src={post.featuredImage.url}
+	          alt={post.title}
+	          className="absolute h-80 w-full rounded-t-lg object-cover object-top shadow-lg lg:rounded-lg"
+	        />
+	      </div>
+	      <h1 className="mb-8 cursor-pointer text-center text-3xl font-semibold transition duration-700 hover:text-pink-600">
+	        <Link href={`/post/${post.slug}`}>{post.title}</Link>
+	      </h1>
+	      <div className="mb-8 block w-full items-center justify-center text-center lg:flex">
+	        <div className="mb-4 mr-8 flex w-full items-center justify-center lg:mb-0 lg:w-auto">
+	          <img
+	            alt={post.author.name}
+	            height="30px"
+	            width="30px"
+	            className="rounded-full align-middle"
+	            src={post.author.photo.url}
+	          />
+	          <p className="ml-2 inline align-middle text-lg text-gray-700">
+	            {post.author.name}
+	          </p>
+	        </div>
+	        <div className="font-medium text-gray-700">
+	          <svg
+	            xmlns="http://www.w3.org/2000/svg"
+	            className="mr-2 inline h-6 w-6 text-pink-500"
+	            fill="none"
+	            viewBox="0 0 24 24"
+	            stroke="currentColor"
+	          >
+	            <path
+	              strokeLinecap="round"
+	              strokeLinejoin="round"
+	              strokeWidth="2"
+	              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+	            />
+	          </svg>
+	          <span>{moment(post.createdAt).format('DD MMM YYYY')}</span>
+	        </div>
+	      </div>
+	      <p className="mb-8 px-4 text-center text-lg font-normal text-gray-700 lg:px-20">
+	        {post.excerpt}
+	      </p>
+	      <div className="text-center">
+	        <Link href={`/post/${post.slug}`}>
+	          <span className="inline-block transform cursor-pointer rounded-full bg-pink-600 px-8 py-3 text-lg font-medium text-white transition duration-500 hover:-translate-y-1">
+	            Continue Reading
+	          </span>
+	        </Link>
+	      </div>
+	    </div>
+	  )
+	}
+
+	export default PostCard
+
+The utility classes can make it look very messy but it's actually not a very complex structre.
+
+This component is now finished and index will map over each of our posts in GraphCMS and display them as this lovely PostCard component!
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 10 - BUILD POST WIDGET
+
+This will be a box on the right of the page that shows recent posts if we are on the home page or related posts if we are already inside a post.
+
+Before we can do this we need to make another query to get the relevant data from GraphCMS.
+
+To do this we go back to index.js in our services folder and at the very bottom we create and export a new aaync function 'getRecentPosts'to make a query and request it from the database. Instead of using the API playground to generate a query we can actually do it here manually. We're going to ask for the posts to be ordered by their creation timestamp and also to sort them in ascending order 'orderBy: createdAt_ASC' and we will specify that we only want the first 3 to be returned 'last: 3':
+
+	export const getRecentPosts = async () => {
+	  const query = gql`
+	    query GetPostDetails() {
+	      posts(
+	        orderBy: createdAt_ASC
+	        last: 3
+	        ) 
+	    }
+	  `
+	}
+
+We then specify what data we want returned from these three:
+
+	export const getRecentPosts = async () => {
+	  const query = gql`
+	    query GetPostDetails() {
+	      posts(
+	        orderBy: createdAt_ASC
+	        last: 3
+	        ) {
+	          title
+	          featuredImage {
+	            url
+	          }
+	          createdAt
+	          slug
+	        }
+	    }
+	  `
+	}
+
+Finally we need to request the data from our API asynchrnously (using our query object) and return the data from the function:
+
+	export const getRecentPosts = async () => {
+	  const query = gql`
+	    query GetPostDetails() {
+	      posts(
+	        orderBy: createdAt_ASC
+	        last: 3
+	        ) {
+	          title
+	          featuredImage {
+	            url
+	          }
+	          createdAt
+	          slug
+	        }
+	    }
+	  `
+
+	  const result = await request(graphqlAPI, query)
+
+	  return result.posts;
+	}
+
+Now we can call this function in our PostWidget component. To do this we'll import useState and useEffect from React:
+
+	import React, { useState, useEffect } from 'react'
+
+First we setup a state that will hold and assign what posts we want the widget to render:
+
+	const PostWidget = () => {
+	  const [relatedPosts, setRelatedPosts] = useState([])
+
+The we'll use the slug (whether or not these is one) to tell if we are on the homepage or in a post/article. To do this we'll pass in the slug (and categories) into the component function as arguments and run the check in a useEffect hook:
+
+  useEffect(() => {
+    if (slug) {
+      getSimilarPosts(category, slug).then((result) => setRelatedPosts(result))
+    } else {
+      getRecentPosts().then((result) => setRelatedPosts(result))
+    }
+
+You can see the if else block deciding what data to fetch and return (using promises and then) but where are these getSimilar and getRecent functions coming from? Well we've already created 'getRecentPosts()' in our services/index file so we just need to import it:
+
+	import { getRecentPosts } from '../services'
+
+Obviously we need to create getSimilarPosts so it's back to servies/index. Note that we did it in this order because getRecentPosts did not require any arguments whereas getSimilarPosts will require both the category and slug.
+
+Something we haven't seen before is that with GraphQL we can specify the argument types for our query using the dollar sign:
+
+	export const getSimilarPosts = async() => {
+	  const query = gql`
+	    query GetPostDetails($slug: String!, $categories: [String!]) {
+
+	    }
+	  `
+	}
+
+So slug will need to be a string and categories will need to be an array of strings.
+
+As with our last query we can filter our posts conditionally. Here we can say return posts that are not the current post:
+
+	posts(where: { slug_not: $slug })
+
+Along with not displaying the current article/post we want to include the categories we want to get in the slug:
+
+  posts(
+    where: {
+      slug_not: $slug
+      AND: { categories_some: { slug_in: $categories } }
+    }
+  )
+
+Finally we specify that of the posts that meet these conditions we only want back the last 3:
+
+  posts(
+    where: {
+      slug_not: $slug
+      AND: { categories_some: { slug_in: $categories } }
+    }
+    last: 3
+  )
+
+So what do we want from these returned posts? The same data as we got for recent posts:
+
+	posts(
+	    where: {
+	      slug_not: $slug
+	      AND: { categories_some: { slug_in: $categories } }
+	    }
+	    last: 3
+	  ) {
+	    title
+	    featuredImage {
+	      url
+	    }
+	    createdAt
+	    slug
+	  }
+
+Finally we request the data asynchronously and return it from our function:
+
+	export const getSimilarPosts = async () => {
+	  const query = gql`
+	    query GetPostDetails($slug: String!, $categories: [String!]) {
+	      posts(
+	        where: {
+	          slug_not: $slug
+	          AND: { categories_some: { slug_in: $categories } }
+	        }
+	        last: 3
+	      ) {
+	        title
+	        featuredImage {
+	          url
+	        }
+	        createdAt
+	        slug
+	      }
+	    }
+	  `
+
+	  const result = await request(graphqlAPI, query)
+
+	  return result.posts
+	}
+
+Now we head back to our PostWidget component to make use of these functions to get 3 recent or related posts depending on whether there is a slug and if so what is it related to categorically.
+
+Now we set our useEffect to update when the slug changes and we are nearly ready to go:
+
+	import React, { useState, useEffect } from 'react'
+	import moment from 'moment'
+	import Link from 'next/link'
+
+	import { getRecentPosts, getSimilarPosts } from '../services'
+
+	const PostWidget = ({ categories, slug }) => {
+	  const [relatedPosts, setRelatedPosts] = useState([])
+
+	  useEffect(() => {
+	    if (slug) {
+	      getSimilarPosts(categories, slug).then((result) =>
+	        setRelatedPosts(result)
+	      )
+	    } else {
+	      getRecentPosts().then((result) => setRelatedPosts(result))
+	    }
+	  }, [slug])
+
+	  console.log(relatedPosts)
+
+	  return <div>PostWidget</div>
+	}
+
+	export default PostWidget
+
+What we're currently missing is the passing of props to this component. We'll actually be calling this component in two different places - in home and inside each article that is rendered. Since if we are on the home page we don't need slug or category to fetch the 3 recent posts then we don't actually need to pass any props when we call the component there.
+
+(!We will pass in the props for the related posts when we use the PostWidget component in our post component!)
+
+For now let's write the JSX to outline our PostWidget display (in the return method):
+
+	return (
+	    <div className="mb-8 rounded-lg bg-white p-8 shadow-lg">
+	      <h3 className="txt-xl mb-8 border-b pb-4 font-semibold">
+	        {slug ? 'Related Posts' : 'Recent Posts'}
+	      </h3>
+	      {relatedPosts.map((post) => (
+	        <div key={post.title} className="mb-4 flex w-full items-center">
+	          <div className="w-16 flex-none">
+	            <img
+	              alt={post.title}
+	              height="60px"
+	              width="60px"
+	              className="rounded-full align-middle"
+	              src={post.featuredImage.url}
+	            />
+	          </div>
+	          <div className="ml-4 flex-grow">
+	            <p className="font-xs text-gray-500">
+	              {moment(post.createdAt).format('DD MMM YYYY')}
+	            </p>
+	            <Link
+	              href={`/post/${post.slug}`}
+	              key={post.title}
+	              className="text-md"
+	            >
+	              {post.title}
+	            </Link>
+	          </div>
+	        </div>
+	      ))}
+	    </div>
+	  )
+
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 11 - BUILD CATEGORIES WIDGET
+
+Now we have to implement our categories widget.
+
+! TIP ! You can hold control and click on a component tag in the code to open that component's script!
+
+As before we will import useState and useEffect from react along with the Link component from next/link.
+
+Now we need to fetch our categories so we will make a new query in our services/index file like we did for the posts:
+
+	export const getCategories = async () => {
+	  const query = gql`
+	    query GetCategories {
+	      categories {
+	        name
+	        slug
+	      }
+	    }
+	  `
+
+	  const result = await request(graphqlAPI, query)
+
+	  return result.categories
+	}
+
+We can then go back to our widget and create a state to hold categories and useEffect to fetch the categories using our query:
+
+	import React, { useState, useEffect } from 'react'
+	import Link from 'next/link'
+
+	import { getCategories } from '../services'
+
+	const Categories = () => {
+	  const [categories, setcategories] = useState([])
+
+	  useEffect(() => {
+	    getCategories().then((newCategories) => setcategories(newCategories))
+	  }, [])
+
+	  return <div>Categories</div>
+	}
+
+	export default Categories
+
+Now we just need to build some JSX to render the categories. This will be similar to our post widget:
+
+  return (
+    <div className="mb-8 rounded-lg bg-white p-8 pb-12 shadow-lg">
+      <h3 className="txt-xl mb-8 border-b pb-4 font-semibold">Categories</h3>
+      {categories.map((category) => (
+        <Link key={category.slug} href={`/category/${category.slug}`}>
+          <span className="mb-3 block cursor-pointer pb-3">
+            {category.name}
+          </span>
+        </Link>
+      ))}
+    </div>
+  )
+
+Now our categories widget will update and show all the categories in our api/database.
+
+Next we need to update our Header to show these categories (they are currently hardcoded):
+
+replace:
+
+	const categories = {
+	  [
+	    { name: 'React', slug: 'react' },
+	    { name: 'Web Development', slug: 'web-dev' },
+	  ]
+	}
+
+with:
+
+	import React, { useState, useEffect } from 'react'
+	import Link from 'next/link'
+
+	import { getCategories } from '../services'
+
+	const Header = () => {
+	  const [categories, setCategories] = useState([])
+
+	  useEffect(() => {
+	    getCategories().then((newCategories) => setCategories(newCategories))
+	  }, [])
+
+Now the JSX will map over the actual categories we fetched from the database rather than the hardcoded placeholder:
+
+	import React, { useState, useEffect } from 'react'
+	import Link from 'next/link'
+
+	import { getCategories } from '../services'
+
+	const Header = () => {
+	  const [categories, setCategories] = useState([])
+
+	  useEffect(() => {
+	    getCategories().then((newCategories) => setCategories(newCategories))
+	  }, [])
+
+	  return (
+	    <div className="container mx-auto mb-8 px-10">
+	      <div className="inline-block w-full border-b border-blue-400 py-8">
+	        <div className="block md:float-left">
+	          <Link href="/">
+	            <span className="cursor-pointer text-4xl font-bold text-white">
+	              Rachel's Blog
+	            </span>
+	          </Link>
+	        </div>
+	        <div className="hidden md:float-left md:contents">
+	          {categories.map((category) => (
+	            <Link key="category.slug" href="{`/category/${category.slug}`}">
+	              <span className="mt-2 ml-4 cursor-pointer align-middle font-semibold text-white md:float-right">
+	                {category.name}
+	              </span>
+	            </Link>
+	          ))}
+	        </div>
+	      </div>
+	    </div>
+	  )
+	}
+
+	export default Header
+
+Now our entire front page is done! We have the Header, the PostCards showing previews of ours posts and our recent posts and categories widgets on the side!
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 11 - BUILD ARTICLE DETAILS PAGE - DYNAMIC PAGE BASED ON SLUG
+
+Now we can start building out the page that will display an individual article once the user has picked one. Remember that the recent posts widget will also change to related posts.
+
+To do this we will create another component, but unlike our usual components this will be a nextjs page. We will create a new folder inside /pages called 'post'.
+
+Inside of this folder we will make a .js/.tsx file called '[slug]'.
+
+This looks weird so what's going on?
+
+NextJS has something called 'FILE BASED ROUTING'. What that means is we don't have to do all the routing ourselves inside of _app.js/.tsx using React Router DOM. Instead, in NextJS we just structure our files in pages folder as we want them to be structure in the actual url. So index is our langing page (omitted from the url). The post folder we just made is then displayed in the url as 'localhost:300/post/'.
+
+When we put square brackets in the '[slug].js' filename we made that file dynamic, meaning anything we put after '/post/...' in our url will open the [slug].js file.
+
+So right now if we go to 'localhost:3000/post/madeupurl' it will return the [slug].js page, even though madeupurl doesn't refer to anything in particular. It will also open if we click any of the postcards or post widgets we've already made.
+
+We will come back to generating this page's content dynamically for now let's sketch it out.
+
+First we will need to import components and queries, some of which we haven't actually made yet:
+
+	import React from 'react'
+
+	import { getPosts, getPostDetails } from '../../services'
+	import {
+	  PostDetail,
+	  Categories,
+	  PostWidget,
+	  Author,
+	  Comments,
+	  CommentsForm,
+	} from '../../components'
+
+Now we will start building the JSX:
+
+	const PostDetails = () => {
+	  return (
+	    <div className="container mx-auto mb-8 px-10">
+	      <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
+	        <div className="col-span-1 lg:col-span-8">
+	          <PostDetail />
+	          <Author />
+	          <CommentsForm />
+	          <Comments />
+	        </div>
+	        <div className="col-span-1 lg:col-span-4">
+	          <div className="relative top-8 lg:sticky">
+	            <PostWidget />
+	            <Categories />
+	          </div>
+	        </div>
+	      </div>
+	    </div>
+	  )
+
+Now we have the boildplate code for rendering the necessary components.
+
+Now let's make the new components we need PostDetail.jsx, Author.jsx, Comments.jsx, and CommentsForm.jsx.
+
+They will all start off the same so we'll copy and past this code and change the relevant name (Comments here for example):
+
+	import React from 'react'
+
+	const Comments = () => {
+	  return (
+	    <div>
+	      <h1>Comments</h1>
+	    </div>
+	  )
+	}
+
+	export default Comments
+
+Now we need to export this components in the index.js file:
+
+	export { default as PostDetail } from './PostDetail'
+	export { default as Author } from './Author'
+	export { default as CommentsForm } from './CommentsForm'
+	export { default as Comments } from './Comments'
+
+Now is we try selecting a post from the homepage our dynamic page ([slug].js) will actually render with the placeholder components we just made.
+
+Going back to [slug].js, how are we going to get the postdetail data?
+
+The answer is to use getStaticProps() again (like we did to get our posts in our pages/index.js):
+
+	export async function getStaticProps() {
+	  const posts = (await getPosts()) || []
+
+	  return {
+	    props: { posts },
+	  }
+	}
+
+Now we need to go to our services/index.js and create an endpoint for PostDetails. This will get all the data for everything we need to display our post (unlike the landing/home page that only needed snippets).
+
+Our 'getPosts' endpoint is getting almost everything so we can copy that, paste it below, and make some changes. We'll rename the endpoint and query, pass in a slug as an argument, specify we want the slug to be a string, and only return the post that matches the slug we will pass in:
+
+	export const getPostDetails = async (slug) => {
+	  const query = gql`
+	    query GetPostDetails($slug: String!) {
+	      post(where: { slug: $slug })
+	      ...
+
+Because we are getting a single post we can remove postsConnection/edges/node and encapsulate what we want to get in braces {}:
+
+	export const getPostDetails = async (slug) => {
+	  const query = gql`
+	    query GetPostDetails($slug: String!) {
+	      post(where: { slug: $slug }) {   
+	        author {
+	          bio
+	          name
+	          id
+	          photo {
+	            url
+	          }
+	        }
+	        createdAt
+	        slug
+	        title
+	        excerpt
+	        featuredImage {
+	          url
+	        }
+	        categories {
+	          name
+	          slug
+	        }
+	      }
+	  `
+
+	  const result = await request(graphqlAPI, query)
+
+	  return result.postsConnection.edges
+	}
+
+Finally we can add the other details we want to get for the post, namely, content { raw }. This is the actual content of the post rather than the meta details about it.
+
+Finally we want to pass in slug as an object as the third argument of request and return result.post:
+
+	export const getPostDetails = async (slug) => {
+	  const query = gql`
+	    query GetPostDetails($slug: String!) {
+	      post(where: { slug: $slug }) {   
+	        author {
+	          bio
+	          name
+	          id
+	          photo {
+	            url
+	          }
+	        }
+	        createdAt
+	        slug
+	        title
+	        excerpt
+	        featuredImage {
+	          url
+	        }
+	        categories {
+	          name
+	          slug
+	        }
+	        content {
+	          raw
+	        }
+	      }
+	  `
+
+	  const result = await request(graphqlAPI, query, { slug })
+
+	  return result.post
+	}
+
+There we have made the endpoint for our PostDetails. Now we can go back to our slug and make a request to this function we just created (getPostDetails) in getStaticProps:
+
+	export async function getStaticProps({ params }) {
+	  const data = await getPostDetails(params.slug)
+
+	  return {
+	    props: { post: data },
+	  }
+	}
+
+Now we go to the top of our [slug].js and pass in the props we just fetched into the PostDetails function and then pass the relevant props to each component:
+
+	import React from 'react'
+
+	import { getPosts, getPostDetails } from '../../services'
+	import {
+	  PostDetail,
+	  Categories,
+	  PostWidget,
+	  Author,
+	  Comments,
+	  CommentsForm,
+	} from '../../components'
+
+	const PostDetails = ({ post }) => {
+	  return (
+	    <div className="container mx-auto mb-8 px-10">
+	      <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
+	        <div className="col-span-1 lg:col-span-8">
+	          <PostDetail post={post} />
+	          <Author author={post.author}/>
+	          <CommentsForm slug={post.slug}/>
+	          <Comments slug={post.slug}/>
+	        </div>
+	        <div className="col-span-1 lg:col-span-4">
+	          <div className="relative top-8 lg:sticky">
+	            <PostWidget slug={post.slug} categories={post.categories.map((category) => category.slug)}/>
+	            <Categories />
+	          </div>
+	        </div>
+	      </div>
+	    </div>
+	  )
+	}
+
+	export default PostDetails
+
+	export async function getStaticProps({ params }) {
+	  const data = await getPostDetails(params.slug)
+
+	  return {
+	    props: { post: data },
+	  }
+	}
+
+Finally we need to generate static paths for NextJS(I don't get it, need to look into it more). This is done at the bottom of our [slug].js file and is required to dynamically route with the slugs?
+
+	export async function getStaticPaths() {
+	  const posts = await getPosts()
+
+	  return {
+	    paths: posts.map(({ node: { slug } }) => ({ params: { slug } })),
+	    fallback: false,
+	  }
+	}
+
+Now we have all the data that we need and we can start working on how we want each component to display it!
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 12 - BUILDING OUT COMPONENTS
+
+Now our dynamic [slug].js page is working we need to build out the PostDetail, Author, CommentsForm, and Comments componenets we breifly created earlier.
+
+PostDetail:
+
+We start off with this placeholder:
+
+	import React from 'react'
+
+	const PostDetail = () => {
+	return (
+	<div>
+	  <h1>PostDetail</h1>
+	</div>
+	)
+	}
+
+	export default PostDetail
+
+We pass in the { post } prop to the function and set up some utility classes on the outermost/container div:
+
+	import React from 'react'
+
+	const PostDetail = ({ post }) => {
+	  return (
+	    <div className="mb-8 rounded-lg bg-white pb-12 shadow-lg lg:p-8">
+	      <h1>PostDetail</h1>
+	    </div>
+	  )
+	}
+
+	export default PostDetail
+
+Then we place an inner div with somemore utility classes and place an image inside of this div and set its attributes dynamically with the post prop:
+
+	import React from 'react'
+
+	const PostDetail = ({ post }) => {
+	  return (
+	    <div className="mb-8 rounded-lg bg-white pb-12 shadow-lg lg:p-8">
+	      <div className="relative mb-6 overflow-hidden shadow-md">
+	        <img
+	          src={post.featuredImage.url}
+	          alt={post.title}
+	          className="h-full w-full rounded-t-lg object-top"
+	        />
+	      </div>
+	    </div>
+	  )
+	}
+
+	export default PostDetail
+
+Now we have a nicely rendered card with the featured image well spaced at the top. We can make a div below this to act as a sub container for meta data like author author image created at etc. No we already set up divs with styling for this info in our PostCard component so even if we didn't know exactly where we did this we can use the magnifying glass in VScode to search our project. When we find the divs we want we can simply copy and paste them (remember to import moment library):
+
+	import React from 'react'
+	import moment from 'moment'
+
+	const PostDetail = ({ post }) => {
+	  return (
+	    <div className="mb-8 rounded-lg bg-white pb-12 shadow-lg lg:p-8">
+	      <div className="relative mb-6 overflow-hidden shadow-md">
+	        <img
+	          src={post.featuredImage.url}
+	          alt={post.title}
+	          className="h-full w-full rounded-t-lg object-top"
+	        />
+	      </div>
+	      <div className="px-4 lg:px-0">
+	        <div className="mb-8 flex w-full items-center">
+	          <div className="mb-4 mr-8 flex w-full items-center justify-center lg:mb-0 lg:w-auto">
+	            <img
+	              alt={post.author.name}
+	              height="30px"
+	              width="30px"
+	              className="rounded-full align-middle"
+	              src={post.author.photo.url}
+	            />
+	            <p className="ml-2 inline align-middle text-lg text-gray-700">
+	              {post.author.name}
+	            </p>
+	          </div>
+	          <div className="font-medium text-gray-700">
+	            <svg
+	              xmlns="http://www.w3.org/2000/svg"
+	              className="mr-2 inline h-6 w-6 text-pink-500"
+	              fill="none"
+	              viewBox="0 0 24 24"
+	              stroke="currentColor"
+	            >
+	              <path
+	                strokeLinecap="round"
+	                strokeLinejoin="round"
+	                strokeWidth="2"
+	                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+	              />
+	            </svg>
+	            <span>{moment(post.createdAt).format('DD MMM YYYY')}</span>
+	          </div>
+	        </div>
+	      </div>
+	    </div>
+	  )
+	}
+
+	export default PostDetail
+
+We could put this meta data about the post into its own component but we're only using it in two places so we will not for now.
+
+This looks good at the large scale but the spacing gets messed up in smaller views so we need to ammend the utility classes. To do this we simply remove 'justify-center' from the image containing div.
+
+Now below this meta data div we can put out title:
+
+    <h1 className="mb-8 text-3xl font-semibold">{post.title}</h1>
+
+Finally we want to actually render out the post content! We can do this right below the title.
+
+post.content.raw is an object and it has children, in this case, an array of 3 type: 'paragraph' objects (our lorem ipsum) containing both the text itself and formatting info.
+
+This data is from the rich text editor in GraphCMS so it will not always be text but can be text, images, tables etc. It is not simply a string our blogger will be writing that we need to handle.
+
+So what we need to do is map over this data (post.content.raw.children) twice in a row to get down to the fragments of content and then use a function we will write shortly to extract that fragment and return the content by calling the same getContentFragment function on the upper object we are mapping:
+
+    {post.content.raw.children.map((typeObj, index) => {
+      const children = typeObj.children.map((item, itemIndex) =>
+        getContentFragment(itemIndex, item.text, item)
+      )
+
+      return getContentFragment(index, children, typeObj, typeObj.type)
+    })}
+
+This is getting very complicated but this is how we need to loop through all of the content in post.content.raw; we need to go through the object piece by piece and apply getContentFragment() to it.
+
+Let's make this function at the top of our component function (before return()):
+
+  const getContentFragment = (index, text, obj, type) => {
+    let modifiedText = text;
+
+    if (obj) {
+      if (obj.bold) {
+        modifiedText = (<b key={index}>{text}</b>);
+      }
+
+      if (obj.italic) {
+        modifiedText = (<em key={index}>{text}</em>);
+      }
+
+      if (obj.underline) {
+        modifiedText = (<u key={index}>{text}</u>);
+      }
+    }
+
+    switch (type) {
+      case 'heading-three':
+        return <h3 key={index} className="text-xl font-semibold mb-4">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</h3>;
+      case 'paragraph':
+        return <p key={index} className="mb-8">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</p>;
+      case 'heading-four':
+        return <h4 key={index} className="text-md font-semibold mb-4">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</h4>;
+      case 'image':
+        return (
+          <img
+            key={index}
+            alt={obj.title}
+            height={obj.height}
+            width={obj.width}
+            src={obj.src}
+          />
+        );
+      default:
+        return modifiedText;
+    }
+  };
+
+
+So what does getContentFragment do?
+
+First we make a variable to store out text, then we start by using if blocks to format the text based on the booleans in the object:
+
+    let modifiedText = text
+
+    if (obj) {
+      if (obj.bold) {
+        modifiedText = <b key={index}>{text}</b>
+      }
+      if (obj.italic) {
+        modifiedText = <em key={index}>{text}</em>
+      }
+      if (obj.underline) {
+        modifiedText = <u key={index}>{text}</u>
+      }
+    }
+    
+Next we use a switch statement to generate JSX elements with the relevant tags, styling, and keys depending on the type passed in to the function (e.g.'paragraph', 'heading-three' etc.). To display the actual content the child of this element is our modified text which we map over to generate a React.Fragment component with the index as a key and the modifiedText as the child of the React.Fragment:
+
+	switch (type) {
+	      case 'heading-three':
+	        return <h3 key={index} className="text-xl font-semibold mb-4">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</h3>;
+	      case 'paragraph':
+	        return <p key={index} className="mb-8">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</p>;
+	      case 'heading-four':
+	        return <h4 key={index} className="text-md font-semibold mb-4">{modifiedText.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>)}</h4>;
+	      case 'image':
+	        return (
+	          <img
+	            key={index}
+	            alt={obj.title}
+	            height={obj.height}
+	            width={obj.width}
+	            src={obj.src}
+	          />
+	        );
+	      default:
+	        return modifiedText;
+	    }
+
+This is very confusing but basically step one it to sort out the content into bold/italic/underlined content and put it in the relevant tags, THEN to put THAT inside the relevant tags depeneding on whether its a paragraph or a heading etc. and to have it in this as a React.Fragment.
+
+But what is a <React.Fragment /> and why use it? Essentially it allows us to wrap multiple elements without creating an extra node to the DOM e.g. they act like a containing div without having to make/render a div.
+
+Simply example:
+
+								function Parent () {
+								  return (
+								    <React.Fragment>
+								      <Child1 />
+								      <Child2 />
+								    </React.Fragment>
+								  );
+								}
+
+React components can only render one element so we usually just wrap multiple elements inside an outer div to get around this. React.Fragment helps us when using a div is not feasible.
+
+This is all very confusing but its simply how we need to parse out rich text in order to convert it into JSX for our app to use.
+
+Now our PostDetail component is complete and all of the content and meta data for the post is displayed and nicely formatted! It is complicated but the functionality we just wrote even allows for gifs and images in our posts.
+
+Author:
+
+Now we can move on to our author component. This will be a series of divs with styling containing our author picture, name, and bio:
+
+import React from 'react'
+import Image from 'next/image'
+
+	const Author = ({ author }) => {
+	  return (
+	    <div className="relative mt-20 mb-8 rounded-lg bg-black bg-opacity-20 p-12 text-center">
+	      <div className="absolute left-0 right-0 -top-14">
+	        <Image
+	          alt={author.name}
+	          unoptimized
+	          height="100px"
+	          width="100px"
+	          className="rounded-full align-middle"
+	          src={author.photo.url}
+	        />
+	      </div>
+	      <h3 className="my-4 text-xl font-bold text-white">{author.name}</h3>
+	      <p className="text-lg text-white">{author.bio}</p>
+	    </div>
+	  )
+	}
+
+	export default Author
+
+Notice we used the <Image /> component from 'next/image'. This is just like the <img /> tag but it allows use to us the keyword 'unoptimized' (when true source image will be served as it without chaning size, quality, format etc.)
+
+CommentsForm:
+
+This is an interesting one because for comments and commentsForm we need to actually write user input to our GraphCMS database as well as retrieve it when we want to display a comment; We are not simply rendering what we create in GraphCMS, the comments will be created in the page itself (using commentsForm) and stored in GraphCMS.
+
+To make our commentsForm component we will be using the useRef, useState, and useEffect hooks imported from react.
+
+We start by making states for and error boolean, local storage, and a success message boolean.
+
+The we use useRef to make temporary storage for comment elements before they're passed to GraphCMS (don't need to put them in state since they're so temporary, this is more efficient):
+
+	import React, { useRef, useState, useEffect } from 'react'
+
+	const CommentsForm = ({ slug }) => {
+	  const [error, setError] = useState(false)
+	  const [localStorage, setLocalStorage] = useState(null)
+	  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+	  const commentEl = useRef()
+	  const name = useRef()
+	  const emailEl = useRef()
+	  const storeDataEl = useRef()
+
+	  return (
+	    <div>
+	      <h1>CommentsForm</h1>
+	    </div>
+	  )
+	}
+
+	export default CommentsForm
+
+Now we're ready to make our output i.e. the form to create and submit a comment.
+
+We make a container for the comment form with a title and bottom border, then make divs for each part of the comment inputs. Notice as well that we set the ref attribute to the relevant ref variable we created before:
+
+  return (
+    <div className="mb-8 rounded-lg bg-white p-8 pb-12 shadow-lg">
+      <h3 className="mb-8 border-b pb-4 text-xl font-semibold">CommentsForm</h3>
+      <div className="mb-4 grid grid-cols-1 gap-4">
+        <textarea
+          ref={commentEl}
+          className="w-full rounded-lg bg-gray-100 p-4 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200"
+          placeholder='Comment'
+          name='comment'
+        />
+      </div>
+      <div className="mb-4 grid grid-cols-1 gap-4"></div>
+      <div className="mb-4 grid grid-cols-1 gap-4"></div>
+    </div>
+  )
+
+Next we can complete the comments form inputs using <input /> tags (adding name and email):
+
+  return (
+ return (
+    <div className="mb-8 rounded-lg bg-white p-8 pb-12 shadow-lg">
+      <h3 className="mb-8 border-b pb-4 text-xl font-semibold">CommentsForm</h3>
+      <div className="mb-4 grid grid-cols-1 gap-4">
+        <textarea
+          ref={commentEl}
+          className="rounded-lg bg-gray-100 p-4 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200 lg:col-span-2"
+          placeholder="Comment"
+          name="comment"
+        />
+      </div>
+      <div className="gird-cols-1 mb-4 grid gap-4 lg:grid-cols-2">
+        <input
+          type="text"
+          ref={nameEl}
+          className="w-full rounded-lg bg-gray-100 py-2 px-4 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200"
+          placeholder="Name"
+          name="name"
+        />
+        <input
+          type="text"
+          ref={nameEl}
+          className="w-full rounded-lg bg-gray-100 py-2 px-4 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200"
+          placeholder="Email"
+          name="email"
+        />
+      </div>
+    </div>
+  )
+
+Below the second to last dive we will display our error message if error == true:
+
+  {error && <p className="text-xs text-red-500">All fields are required.</p>}
+
+And below that we will put a button to submit the comment/form with an onClick callback event:
+
+      <div className="mt-8">
+        <button
+          type="button"
+          onClick={handleCommentSubmission}
+          className="ease inline-block cursor-pointer rounded-full bg-pink-600 px-8 py-3 text-lg text-white transition duration-500 hover:bg-indigo-900"
+        >
+          Post Comment
+        </button>
+      </div>
+
+As you can see this is a lot of utility classes to make a button but we do have a completely custom button with an animated transition all on one line.
+
+Now we add a submission message below the button to display when true/submitted:
+
+    {showSuccessMessage && (
+      <span className="float-right mt-3 text-xl font-semibold text-green-500">
+        Comment submitted for review
+      </span>
+    )}
+
+Now we've handled the presentation of the form we have to handle the data, firstly we need to make the handleCommentSubmission() callback function.
+
+First we set the error to false and then check to see if it should be set to true (if any of the fields are missing input on submission since they are all required).
+
+We are checking the reference.current.value of each so to be tidy we destructre the value and rename it to the refence type. Then we can do a conditional check and setError accordingly based on these values:
+
+  const handleCommentSubmission = () => {
+    setError(false)
+
+    const { value: comment } = commentEl.current;
+    const { value: name } = nameEl.current;
+    const { value: email } = emailEl.current;
+
+    if(!comment || !name || !email) {
+      setError(true)
+      return
+    }
+  }
+
+Name we can form the actual comment object. We make a new object and set name, email, comment, slug as its properties:
+
+    const commentObj = {
+      name,
+      email,
+      comment,
+      slug,
+    }
+
+This is so clean because we destructered name, email, and comment above (with slug being a prop). Otherwise we would have:
+
+	const commentObj = {
+		name: commentEl.current.value,
+		etc.
+	}
+
+Now we have our callback method for submission:
+
+  const handleCommentSubmission = () => {
+    setError(false)
+
+    const { value: comment } = commentEl.current
+    const { value: name } = nameEl.current
+    const { value: email } = emailEl.current
+
+    if (!comment || !name || !email) {
+      setError(true)
+      return
+    }
+
+    const commentObj = {
+      name,
+      email,
+      comment,
+      slug,
+    }
+  }
+
+But next we need to check if the user wants us to save the data into local storage. We will check this with a checkbox and label above our error and button:
+
+  <div className="mb-4 grid grid-cols-1 gap-4">
+    <div>
+      <input
+        ref={storeDataEl}
+        type="checkbox"
+        id="storeData"
+        name="storeData"
+        value="true"
+      />
+      <label
+        className="ml-2 cursor-pointer text-gray-500"
+        htmlFor="storeData"
+      >
+        Save my e-mail and name for the next time I comment.
+      </label>
+    </div>
+  </div>
+
+(The htmlFor attribute is linking the label to the checkbox)
+
+Now we go back to our callback method and destructure the storeDataEl:
+
+    const { value: comment } = commentEl.current
+    const { value: name } = nameEl.current
+    const { value: email } = emailEl.current
+    const { checked: storeData } = storeDataEl.current
+
+Then we can check this and conditionally add or remove name and email from the local storage based on whether the box is checked or not:
+
+    if(storeData) {
+      localStorage.setItem('name', name)
+      localStorage.setItem('email', email)
+    } else {
+      localStorage.removeItem('name', name)
+      localStorage.removeItem('email', email)
+    }
+
+Finally, we need to submit our comment. To do this we need to add a new request function to our services/index.js. Rather than making another graphQl query we will be making a http request to our NextJS backend. This will be done using our api file in pages/:
+
+	export const submitComment = async (obj) => {
+	  const result = await fetch('/api/comments', {
+	    method: 'POST',
+	    body: JSON.stringify(obj),
+	  })
+
+	  return result.json()
+	}
+
+Now we need to make a backend endpoint that will accept our comment.
+
+We'll go to our /pages/api/ file and rename the placeholder to comments.js and add this comment at the top:
+
+	/* Any file inside the folder pages/api is mapped to /api/* and will be treated as an API endpoint instead of a page */
+
+This means any folder in the api folder will be treated as an endpoint and not a page. This is how we are able to create out own backend within a NextJS application. This is why our request was fetching from '/api/comments'.
+
+In this comments file we'll start by importing GraphQLClient and gql from 'graphql-request'.
+
+Then we'll get our api location url from our environment variable:
+
+	import { GraphQLClient, gql } from 'graphql-request'
+
+	const graphqlAPI = process.env.NEXT_PUBLIC_GRAPHCMS_ENDPOINT
+
+Now we can make our endpoint route. To do this we will need to create and fetch a 'Permanent Auth Token' from the setting in our project in GraphCMS. We will assign this to en env variable. This is as simple as hitting create and publish (we will name it dev). Then we copy the value of this new token and save it as an env var:
+
+GRAPHCMS_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImdjbXMtbWFpbi1wcm9kdWN0aW9uIn0.eyJ2ZXJzaW9uIjozLCJpYXQiOjE2NDU4Nzk4MjQsImF1ZCI6WyJodHRwczovL2FwaS1ldS13ZXN0LTIuZ3JhcGhjbXMuY29tL3YyL2NremE5cm8yazFtdjIwMXdnYWY2ZzE2a2cvbWFzdGVyIiwiaHR0cHM6Ly9tYW5hZ2VtZW50LW5leHQuZ3JhcGhjbXMuY29tIl0sImlzcyI6Imh0dHBzOi8vbWFuYWdlbWVudC5ncmFwaGNtcy5jb20vIiwic3ViIjoiNTE1YTUyYjktY2NmOS00ZTY5LWEzZDYtMDE0Y2IyMmU2ZDEwIiwianRpIjoiY2wwM3Vjb2o1MHM5cjAxejIwZzByODJsOSJ9.Z4T2Qp3Y71-oJhAcVRbxLRVA1XM7_2nsH4ESsjRBL77PLkI4eDPkBMn8c29hziqFElAueVBvgNWt-HAZxeWuB6sF8IvOpTWZWFGaor9nZ1iW4JuZYtQx6eaglrfA51m8Zg6Q5VGJ0RnTOepQflQl462gR8REwje8tQLyekjpawuO8wa74KK9Kbe72d6IQsPofjgQ5H5ZfW7BHpUpsoCEsFzswKDv8fle5O2j1md1O3MJxwNFG1tGKD1bMbre5XBo3t7QG2KkP9yy9I8VJHeUdMlXbSnsQRMH8RIP-wKd292RSnr-nSprLXDU16bLv0OFWlu1FCacjjOs8wzegt1G1cHXaGMSqPeDGDj38LsGbMMrOTvVX7fQ-HzZhMezHV-_5P1PHnBD6u3gK97v-1FbmF7VFlMkPR4KuOcRH_XO9tJ3iaBsF8goIxnXZAT7z8fHUDjHXrxBJVsir7jowSj2-GChQ7RknqMn2n2vDEfXgTB4yBulOAS0B0tgPkDZ21MXS0rXAHHgBleagMrpTIZJUCPLhVes737kPwAKfEZpODjvif258iu0KRoJQWV6U2pJdGt2ryZ6PAZzQ7pLRO0vAYDO2kCnXNhxKWsGpEj6CKTho6ICzHCn4KlJIssbGHlL-D1j93k-4nzGHH-z4D5TI97qISTPvTYrXnVucKRiaGM'
+
+(remember to paste the token into a string '')
+
+We will use this to authenticate our graphql client:
+
+	import { GraphQLClient, gql } from 'graphql-request'
+
+	const graphqlAPI = process.env.NEXT_PUBLIC_GRAPHCMS_ENDPOINT
+
+	export default function comments(req, res) {
+	  const graphQLClient = new GraphQLClient(graphqlAPI, {
+	    headers: {
+	      authorization: `Bearer ${process.env.GRAPHCMS_TOKEN}`,
+	    },
+	  })
+	}
+
+Now we've made our graphql client we can make our query. For the first time this won't just be a get query but a mutation query, that is, we want to add or change something in our database. This will take is several arguments that we'll want to use in this mutation:
+
+  const query = gql`
+    mutation CreateComment($name: String!, $email: String!, $comment: String!, $slug: String!) {
+      
+    }
+  `
+
+Notice that arguments in this case need to be prefaced with a dollar sign and declare what data type they will be.
+
+So here we have our query:
+
+  const query = gql`
+    mutation CreateComment(
+      $name: String!
+      $email: String!
+      $comment: String!
+      $slug: String!
+    ) {
+      createComment(data: { name: $name, email: $email, comment: $comment, post: { connect: { slug: $slug } } }) { id }
+    }
+  `
+
+And below we can now execute it:
+
+  const result = await graphQLClient.request(query, req.body)
+
+  return res.status(200).send(result)
+
+(This was very confusing and I don't really get it yet...)
+(We had to make this submitComment function in services which fetches from our api, then we had to go to that api and make a mutation query that can be used with our back end, using the token we generated for access)
+
+Now we go to our commentsForm component and import submitComment from services and finally call it below the if store data block and pass in the commentObj.
+
+    submitComment(commentObj).then((res) => {
+      setShowSuccessMessage(true)
+      setTimeout(() => {
+        setShowSuccessMessage(false)
+      }, 3000)
+    })
+
+(notice we use a timeout to remove the message after 3 seconds)
+
+The last thing we need to do is consider if we are visiting the article for a second time after already having made a comment.
+
+We will do this with an 'onMount' useEffect to access the local storage:
+
+  useEffect(() => {
+    nameEl.current.value = window.localStorage.getItem('name')
+    emailEl.current.value = window.localStorage.getItem('email')
+  }, [])
+
+
+(!There may be a lot of errors at this point, keep watching tutorial until around 2:46:50, main issues are not restarting server after adding a new env.variable, not having a reference to post in our comment model in the schema and also not giving permissions to our auth token).
+
+Now everything is working and we are saving our comments to the database and storing the name and username in the local storage. We can see these comments in graphcms under content>comment and we can choose to delete them if they are inappropriate or publish them to the site!
+
+
+(Only issue is the fields are not clearing... fix in handleCommentSubmission?)
+
+Comments:
+
+So now we have implimented a comment form and the user can add a comment and submit it to our database. Then from GraphCMS we can publish comments or delete them if they are not appropriate.
+
+But right now we will not see published comments anywhere. We want them to display in our individual articles below the comment form so we need to build our comment component and put it in our [slug].js
+
+Firstly we'll import the following:
+
+	import React, { useState, useEffect } from 'react'
+	import moment from 'moment'
+	import parse from 'html-react-parser'	
+
+Then we'll set up a state to hold and set comments and a deadmount useEffect to get comments at start:
+
+	import React, { useState, useEffect } from 'react'
+	import moment from 'moment'
+	import parse from 'html-react-parser'
+
+	const Comments = ({ slug }) => {
+	  const [comments, setComments] = useState([])
+
+	  useEffect(() => {
+	    getComments(slug)
+	  }, [])
+
+	  return (
+	    <div>
+	      <h1>Comments</h1>
+	    </div>
+	  )
+	}
+
+	export default Comments
+
+We haven't made getComments() yet so let's go to services/index.js and do so.
+
+We are again writing an async function that generates a query and calls a request on our API then returns the results:
+
+	export const getComments = async (slug) => {
+	  const query = gql`
+	    query GetComments($slug: String!) {
+	      comments(where: { post: { slug: $slug } }) {
+	        name
+	        createdAt
+	        comment
+	      }
+	    }
+	  `
+
+	  const result = await request(graphqlAPI, query, { slug })
+
+	  return result.comments
+	}
+
+Now we go back to our Comments component and import it. We can then use .then() on the function to set the result to our comments state:
+
+
+  useEffect(() => {
+    getComments(slug).then((result) => setComments(result))
+  }, [])
+
+Now we can render this state in our return block by mapping over it inside of a react element:
+
+  return (
+    <>
+      {comments.length > 0 && (
+        <div className="mb-8 rounded-lg bg-white p-8 pb-12 shadow-lg">
+          <h3 className="mb-8 border-b pb-4 text-xl font-semibold">
+            {comments.length} Comments
+          </h3>
+          {comments.map((comment) => (
+            <div
+              key={comment.createdAt}
+              className="mb-4 border-b border-gray-100 pb-4"
+            >
+              <p className="mb-4">
+                <span className="font-semibold">{comment.name}</span> on{' '}
+                {moment(comment.createdAt).format('DD MMM YYYY')}
+              </p>
+              <p className="text-grey-600 w-full whitespace-pre-line">
+                {parse(comment.comment)}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+
+(This {' '} is just to leave a space)
+
+Now we have all of our published comments displaying nicely below our comment form!
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 13 - CODE OUT FEATURED POSTS SECTION CHALLENGE
+
+-> CommentsForm cleared comment on submit and name and email if save unchecked
+
+    submitComment(commentObj).then((res) => {
+      commentEl.current.value = ''
+      if (!storeDataEl.current.checked) {
+        nameEl.current.value = ''
+        emailEl.current.value = ''
+      }
+      setShowSuccessMessage(true)
+      setTimeout(() => {
+        setShowSuccessMessage(false)
+      }, 3000)
+
+-> made it so the save my email is checked on load if name and email is in local storage
+
+  useEffect(() => {
+    nameEl.current.value = window.localStorage.getItem('name')
+    emailEl.current.value = window.localStorage.getItem('email')
+    if (window.localStorage.name && window.localStorage.email) {
+      storeDataEl.current.checked = true
+    } else {
+      storeDataEl.current.checked = false
+    }
+  }, [])
+
+IMPLEMENTING FEATURS:
+
+new folder sections > new file featuredPosts.jsx
+
+new component featuredPostCard.jsx
+
+new function in services/index.js 'getFeaturedPosts()'
+
+new index.js in sections to export FeaturedPosts.jsx
+
+export 'FeaturedPostCard' from components using index.js
+
+Finally, import component in pages/index.tsx and put it below the Head tag.
+
+This displays our featured posts at the top!
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+STEP 14 - IMPLIMENT CATEGORIES LINKS IN NAVBAR
+
+Create a new folder in pages with a new file: category/[slug].js
+
+In the components folder create new component Loader and export (svg to show loading)
+
+Replace services/index.js with code from tutor (this is all copy and pasting at this point, need to review myself afterwards).
+
+Finally, go to pages/post/[slug].js. We currently have a getStaticPaths() function with fallback set to false. This will statically generate out site. This makes it very fast but when we deploy the site we won't be able to access new posts from GraphCMS, that is, all of our current posts are currently going to be statically generated.
+
+To remedy this we set fallback to true and add a loader at the top using useRouter:
+
+	import { useRouter } from 'next/router'
+
+We also import the Loader component.
+
+Now, right at the top of the postDetails function we put:
+
+	const PostDetails = ({ post }) => {
+	  const router = useRouter()
+
+	  if(router.isFallback) {
+	    return <Loader />
+	  }
+	  
+With this we should be able to see all the new articles we make even after deployment.
+
+!Need to come back and look at this again - understand getStaticPaths(), fallback property, router etc.
+
+
+-----------------------------------------------------------------------------------------------------
+
+
+
+
+STEP 15 - PUBLISHING - DEPLOYING WITH VERCEL
+
+The first thing we need to do is create a new github repository.
+
+(look into GitKraken for an git GUI)
+
+We can do this by navigating to our githgub account and hitting new repository.
+
+We'll name it rachel_blog
+
+Hit create then follow the steps to publish it:
+
+- In VSCode open terminal (remember to end process if currently running)
+- Make sure you are in your project's root dir then type:
+
+	git init
+
+- You should see 'initialized' or reinitialized', referring to our local git repository.
+- We need to link our local repo to our remote github repo we just made
+- First we need to add the .env file to gitignore
+- Open .gitignore file and under # local env files add '.env' to the top
+- We do this because we don't want it pushed to github because it is sensative info
+- Now we are ready to populate the staging area. Think of it like putting people into a lift you want to send to the top floor (remote repo). Everything in the gitignore file are people we don't want to go to the top because they're not needed or hold sensative info.
+- To add all files that aren't being ignored to the staging area:
+
+	git add .
+
+- Going back to the publishing page for our remote repo you'll see they helpfully include the steps we need to take with the command for our terminal.
+- A 'commit' is like a snapshot of our project git will never change unless we explicitly say so. By making these commits we have a histroy going back of versions of our project so if something breaks we can simply go back to a previous commit/snapshot. Let's do this now:
+
+	git commit -m "first commit"
+
+- The '-m' is a 'flag' used to create a message for this snapshot, in this case, "first commit". Typically you make these comments useful by listing the changes you have made since the last commit. Think of it like writing on the bottom of a polaroid so you know what each snapshot represents/what stage the project was at.
+- The strucutre of our repo is of a series of commits one after the other like a tube map. Initially there is the main branch that has all of our commits from start to finish. We can, however, branch off from any commit and in essence keep parallel versions of our project alongside the main branch. A good example would be a main branch names production and branching off of that a development branch. So we can make commits to our dev branch without affecting (and potentially breaking) the production branch.
+- We want to push this snapshot/commit to our main branch so we select the branch, add our remote repo location, then push our commit to the main branch of our remote repo:
+
+	git branch -M main
+	
+	git remote add origin https://github.com/JamesLyddon/rachel_blog.git
+	
+	git push -u origin main
+
+If we want to check what's going on with git at any time from our terminal we can use:
+
+	git status
+
+This will tell us what brach we are current on and how remove from origin we are currently (e.g. 1 commit)
+
+Now we can refresh the github window and we should see our remote repo!
+
+Now we need to go to vercel.com and login (can use github account)
+
+Now create a new project. From here you can add your github account and choose which repo you want to deploy.
+
+Find rachel_blog and hit import.
+
+Most settings are fine but we need to adjust our envirnoment variables. This is how we will pass our graphcms endpoint and our graphcms token to our deployed site without exposing them in our github repo.
+
+Add the .env variables by copy and pasting their names and values (not in quotes)
+
+Finally we can hit deploy!!!
+
+(I hit an error the first time I tried so I went back into vscode, converted my typescript files to javascript and pushed the change to the repo. The really cool thing is I didn't have to try deploying from scratch, vercel updated the deployment from the updated repo!)
+
+Now our blog is finally at a point where we (or someone else) can create new content for the blog in graphcms and publish it and it will update the site with them having to know anything about code! They simply need to go into GraphCMS, go to content, posts, and create new items and publish them. They'll also need to manage comments and choose which to publish.
+
+! Need to look into custom urls (current is https://rachel-blog.vercel.app/)
+! carousel buttons look off on mobile, need to fiddle - look in sections/featuredposts 
+! generally thing about optimising for mobile
